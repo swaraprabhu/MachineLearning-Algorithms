@@ -1,0 +1,487 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.preprocessing import StandardScaler
+from scipy.stats import skew
+
+import warnings
+warnings.filterwarnings("ignore")
+%matplotlib inline
+
+# read data into a DataFrame
+
+df = pd.read_csv('E:\Data Science\CSV files\Advertising.CSV', index_col=0)
+df.head(10)
+
+print(df.dtypes)
+print(df.shape)
+print(df.describe())
+
+### Assumption 1: There Should be no outliers in the data
+
+df.boxplot()
+
+df.boxplot(column="newspaper")
+
+
+Note: If outlier Present then we can treat using below approch
+Elimination
+
+Directly droping the variable
+Treat the outlier
+
+using Caping and Floaring Approch
+Replace Using Measure of Central Tendencies
+If cluster is present then leave them as it is
+
+Check with Client if this is acceptable range or not
+
+### check missing data
+
+from utility import check_missing_value
+
+missed_values = check_missing_value(df)
+missed_values
+
+df.isnull().sum()
+
+plt.figure(figsize=(15,5))
+sns.heatmap(df.isnull(), cbar=False, yticklabels=False, cmap="magma")
+
+Note : 
+    1. if Missing value containd more than 50% of the data then you can drop the entire colum
+    2. if less than 50% then we can treat those missing values by using measure of central tendency
+    3. if column is categorical then you can use median to replace missing values
+    4. if column is continuous numerical variable then you can use mean if that variable is not skewed
+    5. you can predict the missing values by using other features (not recommended)
+    6. You can directly ask to client
+    7. Common sense
+            
+
+
+### Assumption 2 : Assumption of Linearity : Every independent variable should have a linear relationship with the dependent variable
+
+sns.pairplot(df,x_vars=["TV","radio","newspaper"],
+             y_vars="sales",
+             kind='reg')
+
+##### Note:If the assumption of linearity is not met then we can  drop that variable
+
+-> Strong positive linear relationship in TV and Sales
+
+-> Moderately strong positive linear relationship in radio and sales
+
+-> No relation in Newspaper, sales also C.I is also high
+
+
+
+
+# print all column names
+df.columns
+
+# create X and Y
+feature_cols= ['TV','radio','newspaper']
+X=df[['TV','radio','newspaper']]
+Y=df.sales
+
+### Assumption 3 :  Assumption of Normality : The dependent variable should follow an approximate normal distribution
+
+sns.distplot(Y,hist=True)
+
+ -> Sales variable is meeting the assumption and we can see the approximate normal distribution
+
+
+
+### Note : if it is not normal or if its skewed plot then we can transform the column in different transformation
+
+1. Log Transform
+    * Most of the time we prefer log transform, becuase it will help you to smoothing of curve
+     
+     
+2. SQRT transform
+    * In SQRT transform we can see peeks and sometime it will not help you to smoothing of curve
+    
+    
+
+#### you can use this code to convert into log transformation
+
+## to convert into log transformation
+
+Y_log=np.log(Y)
+sns.distplot(Y_log,hist=True)
+
+#### Note ; If your data is approximate normal then dont transform because you will get skewed data
+
+Note : For good practice make sure that your X variables does not contain high skewness and if its approximately normal then its good
+
+# check hist for all variables 
+X.hist(bins=20)
+plt.show()
+
+# check hist for all variables after log transform of newspaper
+
+X.hist(bins=20)
+plt.show()
+
+from scipy.stats import skew
+data_num_skew=X.apply(lambda x:skew(x.dropna()))
+data_num_skewed=data_num_skew[(data_num_skew>0.75)|(data_num_skew<-0.75)]
+print(data_num_skew)
+print(data_num_skewed)
+
+#apply log + 1 transformation for all numeric features with sewness over 0.75
+
+X[data_num_skewed.index]=np.log1p(X[data_num_skewed.index])
+
+# check hist for all variables after log transform of newspaper
+
+X.hist(bins=20)
+plt.show()
+
+* Range of skewness is -1 to +1 and value close to 0 means normal distribuiton
+
+Note: Types of Models
+
+Log - Transform
+Level - Original
+
+X        Y
+Log   - Log
+Log   - Level
+Level - Log
+Level - Level 
+
+### Assumption 4. There should be No multicolinearity in the Data¶
+
+Multicolinearity is problem where one variable is dependent on other, we want dependecy between x and y variable but not in the X variables, so if X variables are depend on each other then the model will not be good.
+
+To check the multicolinearity we can use the pearson correlation or VIF value
+    
+
+### Pearson Corrlelation
+
+corr_df = X.corr(method="pearson")
+print(corr_df)
+
+sns.heatmap(corr_df, vmax=1.0, vmin=-1.0, annot=True)
+plt.show()
+
+###### We want value close to 0 means that is not correlated with each other
+
+Note: If the correlation is high between two variables then drop one beacuse bothe varible carrying the similar information so eliminate the varible but think logically.¶
+
+#### Check VIF
+
+Sometimes the correlation matrix alone will not help you to check the multicolinearity so you can use VIF
+
+from statsmodels.stats.outliers_influence import variance_inflation_factor as vif
+
+vif_df = pd.DataFrame()
+vif_df["features"] = X.columns
+vif_df["VIF Factor"] = [vif(X.values, i) for i in range(X.shape[1])]
+vif_df.round(2)
+
+less than 5 value is good in VIF Which represent no multicolinearity
+
+Note: Once you eliminate one variable based on VIF score then other variable's
+      VIF also change and it will decrease so never eliminate all variables at 
+      once, so Remove Variables with Highest value and then Run the function again.
+     Also use domain Knowledge Don’t just depend on VIF Values.
+
+ df.drop("newspaper", axis=1, inplace=True)
+# Rerun the VIF CODE 
+
+# from sklearn.preprocessing import StandardScaler
+
+# scaler = StandardScaler()
+
+# scaler.fit(X)
+
+# X = scaler.transform(X)
+# print(X)
+
+from sklearn.model_selection import train_test_split
+
+# > 1000 --> TEST SIZE = 0.3
+# < 1000 --> TEST SIZE = 0.2
+
+#Split the data into test and train
+X_train, X_test, Y_train, Y_test = train_test_split(X, 
+                                                    Y, 
+                                                    test_size=0.2,
+                                                    random_state=10)  
+
+
+print(X_train.shape)
+print(Y_train.shape)
+print(X_test.shape)
+print(Y_test.shape)
+
+
+X_train
+
+# from sklearn import linear_model
+# import sklearn
+# dir(sklearn)
+
+from sklearn.linear_model import LinearRegression
+
+# creat a model object 
+lm = LinearRegression()
+
+# train the model object
+lm.fit(X_train,Y_train)
+
+# print intercept and coefficients
+print (lm.intercept_)
+print (lm.coef_)
+
+
+# pair the feature names with the coefficients
+print(list(zip(feature_cols, lm.coef_)))
+
+# try chaging the value of X 
+
+X1=100 # radio 
+X2=100 # TV
+X3=0  # NEWPAPER
+y_pred=3.41064158861+(0.04303172 *X1)+(0.19352212*X2)+(-0.00386729*X3)
+print(y_pred)
+
+Y_pred=lm.predict(X_test)
+print(Y_pred)
+
+new_df = pd.DataFrame()
+new_df = X_test
+
+new_df["Actual Sales"] = Y_test
+new_df["Predicted Sales"] = Y_pred
+new_df
+
+from sklearn.metrics import r2_score,mean_squared_error
+import numpy as np
+
+r2=r2_score(Y_test,Y_pred)
+print(r2)
+
+rmse=np.sqrt(mean_squared_error(Y_test,Y_pred))
+print(rmse)
+
+adjusted_r_squared=1-(1-r2)*(len(Y)-1)/(len(Y)-X.shape[1]-1)
+print(adjusted_r_squared)
+
+RSquare tells you how much variablilty you can explain in the data with the help of regression equation. You will get value in the range of 0 to 1. If it is so close to 1 means good model otherwise worst model(sometimes will get value less than 0)
+
+print(min(Y))
+print(max(Y))
+
+new_df["Deviation"]=new_df["Actual Sales"]-new_df["Predicted Sales"]
+new_df.to_excel("Advertising_Pred.xlsx",header=True,index=False)
+new_df.head()
+
+
+
+###  Ridge Regression
+
+from sklearn.model_selection import train_test_split
+
+#Split the data into test and train
+X_train,X_test,Y_train,Y_test=train_test_split(X,Y,test_size=0.2,random_state=10)
+
+from sklearn.linear_model import Ridge
+
+lm_ridge=Ridge()
+lm_ridge.fit(X_train,Y_train)
+
+#print intercept and co-efficients for Ridge regression'
+
+print(lm_ridge.intercept_)
+print(lm_ridge.coef_)
+
+#previous value using regression
+#3.3532913858151474
+#[0.0437425  0.19303708  -0.04895137]
+
+
+
+#prediction using Ridge Regression
+Y_pred_ridge=lm_ridge.predict(X_test)
+
+r2_ridge=r2_score(Y_test,Y_pred_ridge)
+print(r2_ridge)
+
+rmse_ridge=np.sqrt(mean_squared_error(Y_test,Y_pred_ridge))
+print(rmse_ridge)
+
+adjusted_r_squared_ridge=1-(1-r2_ridge)*(len(Y)-1)/(len(Y)-X.shape[1]-1)
+print(adjusted_r_squared_ridge)
+
+#previous value for LR
+#0.834801071903532
+#2.59297691109306
+#0.8322725168816474
+
+### Lasso Regression
+
+from sklearn.model_selection import train_test_split
+
+#Split the data into test and train
+X_train,X_test, Y_train, Y_test =train_test_split(X,Y,test_size=0.2,random_state=10)
+
+from sklearn.linear_model import Lasso
+lm_Lasso=Lasso()
+lm_Lasso.fit(X_train,Y_train)
+
+#print intercept and coefficients for lasso regression
+print(lm_Lasso.intercept_)
+print(lm_Lasso.coef_)
+
+#previous Value using Regression
+# 3.3522471725965985
+# [ 0.04374234  0.19302603  -0.04853131]
+
+from sklearn.metrics import r2_score ,mean_squared_error
+#prediction using Lasso Regression
+
+Y_pred_Lasso=lm_Lasso.predict(X_test)
+
+r2_Lasso=r2_score(Y_test,Y_pred_Lasso)
+print(r2_Lasso)
+
+rmse_Lasso=np.sqrt(mean_squared_error(Y_test,Y_pred_Lasso))
+print(rmse_Lasso)
+
+adjusted_r_squared_Lasso=1-(1-r2_Lasso)* (len(Y)-1)/(len(Y)-X.shape[1]-1)
+print(adjusted_r_squared_Lasso)
+
+### OLS Regression
+
+new_df=pd.DataFrame()
+new_df=X_train
+
+new_df["sales"]=Y_train
+new_df.shape
+
+import statsmodels.formula.api as sm
+
+#create a fitted model with all three features
+
+lm_model=sm.ols(formula='sales ~ TV + radio + newspaper',data =new_df).fit()
+
+#print the coefficients
+print(lm_model.params)
+print(lm_model.summary())
+
+Hypothesis 
+
+Null H0 : there is no significant relationship between x and y variable
+    
+    
+Alternate H1 : there is significant relationship between x and y variable 
+
+p<0.05
+
+if p-value is low then null must go
+if p-value is high then null must fly 
+
+
+tv-sales =H1
+newspaper-sales =NO
+
+### Assumption 5: There should be No autocorelation in the data (check using Durbin-Watsaon)
+
+Corelation is the relation between the variables 
+autocorelation is the relation is between the observation, so whenevr you have such kind of data where your onservation are interdependent on each other, then linear regression algorithm is not suitable for eg: Time series data like stock prediction.
+
+     .output range ->0 to 4
+     .close to 2 , no autocorelation
+     .close to 4 , -ve autocorelation
+     .close to 0 , +ve autocorelation
+     
+Note: If autocorelation is present then perform Time Series or Other Algorithms
+     
+
+
+Y_pred_new=lm_model.predict(X_test)
+
+from sklearn.metrics import r2_score,mean_squared_error
+import numpy as np
+
+r2score=r2_score(Y_test,Y_pred)
+print(r2score)
+
+rmse=np.sqrt(mean_squared_error(Y_test,Y_pred_new))
+print(rmse)
+
+adjusted_r_squared_ols=1-(1-r2score)* (len(Y)-1)/(len(Y)-X.shape[1]-1)
+print(adjusted_r_squared_ols)
+
+### Eliminate Newspaper
+
+
+
+import statsmodels.formula.api as sm
+
+#create a fitted model with all three features
+lm_model =sm.ols(formula = 'sales ~ TV+radio',data=new_df).fit()
+
+#print the coefficients
+print(lm_model.params)
+print(lm_model.summary())
+
+Y_pred_new=lm_model.predict(X_test)
+
+from sklearn.metrics import r2_score,mean_squared_error
+import numpy as np
+
+r2score=r2_score(Y_test,Y_pred)
+print(r2score)
+
+rmse=np.sqrt(mean_squared_error(Y_test,Y_pred_new))
+print(rmse)
+
+adjusted_r_squared_ols=1-(1-r2score)* (len(Y)-1)/(len(Y)-X.shape[1]-1)
+print(adjusted_r_squared_ols)
+
+### Assumption6 : Error should be Random(check using Residual v/S Fitted)
+
+import matplotlib.pyplot as plt
+plot_lm_1=plt.figure(1)
+plot_lm_1.set_figheight(8)
+plot_lm_1.set_figwidth(12)
+
+#fitted values(need a constant term for intercept)
+model_fitted_y=lm_model.fittedvalues
+
+plot_lm_1.axes[0]=sns.residplot(model_fitted_y,"sales",data=new_df,lowess=True)
+
+plot_lm_1.axes[0].set_title("Residuals V/S Fitted")
+plot_lm_1.axes[0].set_xlabel("Fitted values")
+plot_lm_1.axes[0].set_ylabel("Residuals")
+
+plt.show()
+
+### Note : This plot does not contain any wave like pattern or repeating straight pattern of line, this line is randon , so error is random
+
+#A   P    E
+#10  12   2
+#11  13   2
+#14  16   2
+
+### Assumption7 : Error should follow a normal distribution (check using normal quantile plot)
+
+res=lm_model.resid
+import statsmodels.api as stm
+import scipy.stats as stats
+
+fig=stm.qqplot(res,fit=True, line="45")
+plt.title("Normal Q-Q")
+plt.xlabel("Theoritical Quantiles")
+plt.ylabel('Standardized Residuals')
+plt.show()
+
+#### Note:if most of the data point is falling on the red line then its good case and error s normally distributed
+
+### Assumption 8: Error should follow constant variance (homescadscity) andd if errir is not following conatant variance then its (heteroscadascity) (check using scale location)
+
